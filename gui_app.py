@@ -308,8 +308,8 @@ def analyze_video_file(file_path):
         
         # Add Dolby Vision warning prefix if detected
         if is_dolby_vision:
-            # Prepend Dolby Vision warning with red color (HTML format)
-            dolby_prefix = '<span style="color: rgb(255, 0, 0); font-weight: bold;">⚠️杜比视界</span>'
+            # Prepend Dolby Vision warning with red color (HTML format) and tooltip
+            dolby_prefix = '<span style="color: rgb(255, 0, 0); font-weight: bold;" title="请给调色师提前调色再导入剪辑">⚠️杜比视界</span>'
             color_display = dolby_prefix + ' ' + color_display
         
         if is_hdr:
