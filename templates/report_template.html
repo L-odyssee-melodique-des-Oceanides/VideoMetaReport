@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频分析报告 - {{timestamp}}</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            margin: 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 {
+            color: #4ec9b0;
+            border-bottom: 2px solid #4ec9b0;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #ce9178;
+            margin-top: 30px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th {
+            background-color: #2d2d30;
+            color: #9cdcfe;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #3e3e42;
+            font-weight: bold;
+        }
+        td {
+            padding: 8px 10px;
+            border: 1px solid #3e3e42;
+            vertical-align: top;
+        }
+        tr:nth-child(even) {
+            background-color: #252526;
+        }
+        tr:hover {
+            background-color: #2a2d2e;
+        }
+        .red { color: #f48771; font-weight: bold; }
+        .yellow { color: #ffd700; }
+        .green { color: #6a9955; font-weight: bold; }
+        .blue { color: #569cd6; font-weight: bold; }
+        .cyan { color: #4ec9b0; }
+        .gray { color: #858585; }
+        .white { color: #d4d4d4; }
+        .stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            padding: 15px;
+            min-width: 200px;
+            flex: 1;
+        }
+        .stat-title {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #ce9178;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .summary {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .copy-btn {
+            color: #4ec9b0;
+            cursor: pointer;
+            text-decoration: underline;
+            border: none;
+            background: none;
+            padding: 0;
+            font: inherit;
+        }
+        .copy-btn:hover { color: #6a9955; }
+        .filter-buttons {
+            margin: 20px 0;
+        }
+        .filter-btn {
+            padding: 8px 15px;
+            margin-right: 10px;
+            background-color: #2d2d30;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .filter-btn:hover { background-color: #3e3e42; }
+        .filter-btn.active {
+            background-color: #007acc;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 视频分析报告</h1>
+    <div class="summary">
+        <p><strong>分析时间:</strong> {{timestamp}}</p>
+        <p><strong>分析路径:</strong> {{input_path}}</p>
+        <p><strong>总文件数:</strong> {{total_files}}</p>
+        <p><em>点击目录或文件名可复制完整路径到剪贴板</em></p>
+    </div>
+    
+    <h2>📊 统计概览</h2>
+    <div class="stats">
+        <div class="stat-box">
+            <div class="stat-title">分辨率分布</div>
+            <div class="stat-value red">{{low_resolution_count}} <span class="white">({{low_resolution_percent}}%)</span></div>
+            <div class="stat-title">低画质(<1080p)</div>
+            <div class="stat-value yellow">{{good_resolution_count}} <span class="white">({{good_resolution_percent}}%)</span></div>
+            <div class="stat-title">1080p</div>
+            <div class="stat-value green">{{excellent_resolution_count}} <span class="white">({{excellent_resolution_percent}}%)</span></div>
+            <div class="stat-title">4K</div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-title">帧率分布</div>
+            <div class="stat-value red">{{low_framerate_count}} <span class="white">({{low_framerate_percent}}%)</span></div>
+            <div class="stat-title">低帧率(<28fps)</div>
+            <div class="stat-value yellow">{{normal_framerate_count}} <span class="white">({{normal_framerate_percent}}%)</span></div>
+            <div class="stat-title">30fps</div>
+            <div class="stat-value green">{{high_framerate_count}} <span class="white">({{high_framerate_percent}}%)</span></div>
+            <div class="stat-title">60fps</div>
+        </div>
+        
+        <div class="stat-box">
+            <div class="stat-title">色彩空间分布</div>
+            <div class="stat-value blue">{{hdr_count}} <span class="white">({{hdr_percent}}%)</span></div>
+            <div class="stat-title">HDR视频</div>
+            <div class="stat-value red">{{other_color_space_count}} <span class="white">({{other_color_space_percent}}%)</span></div>
+            <div class="stat-title">其他非SDR</div>
+            <div class="stat-value white">{{sdr_count}} <span class="white">({{sdr_percent}}%)</span></div>
+            <div class="stat-title">SDR视频</div>
+        </div>
+    </div>
+    
+    <h2>📋 详细分析结果</h2>
+    <div class="filter-buttons">
+        <button class="filter-btn active" onclick="filterTable('all')">全部</button>
+        <button class="filter-btn" onclick="filterTable('red')">需要处理</button>
+        <button class="filter-btn" onclick="filterTable('yellow')">建议优化</button>
+        <button class="filter-btn" onclick="filterTable('green')">高质量</button>
+        <button class="filter-btn" onclick="filterTable('blue')">HDR格式</button>
+    </div>
+    
+    <table id="videoTable">
+        <thead>
+            <tr>
+                <th width="30%">目录路径</th>
+                <th width="25%">文件名</th>
+                <th width="15%">分辨率状态</th>
+                <th width="15%">帧率状态</th>
+                <th width="15%">色彩空间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{table_rows}}
+        </tbody>
+    </table>
+    
+    <div style="color: #858585; font-style: italic; margin-top: 30px; text-align: center;">
+        报告生成时间: {{timestamp}} | 脚本版本: Web v1.0
+    </div>
+
+    <script>
+        function filterTable(filter) {
+            var buttons = document.querySelectorAll('.filter-btn');
+            buttons.forEach(function(btn) { btn.classList.remove('active'); });
+            event.target.classList.add('active');
+            
+            var rows = document.querySelectorAll('.data-row');
+            rows.forEach(function(row) {
+                if (filter === 'all') {
+                    row.style.display = '';
+                } else {
+                    row.style.display = row.classList.contains(filter) ? '' : 'none';
+                }
+            });
+        }
+        
+        function copyToClipboard(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('✅ 已复制到剪贴板');
+            } catch (err) {
+                alert('❌ 复制失败');
+            }
+            document.body.removeChild(textArea);
+        }
+    </script>
+</body>
+</html>
+
+
