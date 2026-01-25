@@ -373,17 +373,14 @@ def analyze_video_file(file_path):
         
         # Add RAW video warning if detected
         if is_raw_video:
-            raw_prefix = '<span style="color: rgb(255, 165, 0); font-weight: bold;" title="RAW视频可能需要提前降噪">⚠️RAW视频</span>'
-            color_display = raw_prefix
-            color_space_color = "red"
+            color_display = 'RAW视频'
             color_category = "RAW"
             is_other_color_space = True
         
-        # Add Dolby Vision warning prefix if detected
+        # Add Dolby Vision label if detected
         if is_dolby_vision:
-            # Prepend Dolby Vision warning with red color (HTML format) and tooltip
-            dolby_prefix = '<span style="color: rgb(255, 0, 0); font-weight: bold;" title="请给调色师提前调色再导入剪辑">⚠️杜比视界</span>'
-            color_display = dolby_prefix + ' ' + color_display
+            dolby_label = '杜比视界'
+            color_display = dolby_label + ' ' + color_display if color_display else dolby_label
         
         if is_hdr:
             color_space_color = "blue"
@@ -412,7 +409,8 @@ def analyze_video_file(file_path):
             'colorSpaceColor': color_space_color,
             'colorCategory': color_category,
             'resolutionLabel': resolution_label,
-            'isDolbyVision': is_dolby_vision
+            'isDolbyVision': is_dolby_vision,
+            'isRawVideo': is_raw_video
         }
     except Exception as e:
         print(f"Error analyzing {file_path}: {e}")
@@ -482,8 +480,27 @@ def generate_html_report(results, statistics, input_path):
             # colorSpace may contain HTML (for Dolby Vision warning), so don't escape it
             display_color_space = result['colorSpace']
             
-            # Get ISO display value
-            display_iso = result.get('iso', '-')
+            # Build notes column based on conditions
+            notes_content = ""
+            iso_str = result.get('iso', '-')
+            is_raw = result.get('isRawVideo', False)
+            is_dolby = result.get('isDolbyVision', False)
+            
+            if is_dolby:
+                notes_content = "杜比视界需要提前调色再导入"
+            elif iso_str != '-':
+                try:
+                    iso_num = int(iso_str)
+                    if is_raw and iso_num > 800:
+                        notes_content = f"ISO为{iso_num}，考虑提前降噪"
+                    elif not is_raw and iso_num > 4000:
+                        notes_content = f"ISO为{iso_num}，考虑提前降噪"
+                    else:
+                        notes_content = "-"
+                except ValueError:
+                    notes_content = iso_str
+            else:
+                notes_content = "-"
             
             table_rows += f'''
             <tr class="data-row {row_class}">
@@ -496,7 +513,7 @@ def generate_html_report(results, statistics, input_path):
                 <td class="{result['resolutionColor']}">{display_res_status}</td>
                 <td class="{result['framerateColor']}">{display_fps_status}</td>
                 <td class="{result['colorSpaceColor']}">{display_color_space}</td>
-                <td>{display_iso}</td>
+                <td class="white">{notes_content}</td>
             </tr>
 '''
     
