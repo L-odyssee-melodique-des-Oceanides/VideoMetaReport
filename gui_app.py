@@ -19,7 +19,11 @@ import queue
 VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', 
                     '.mpg', '.mpeg', '.ts', '.mts', '.m2ts', '.hevc', '.h264', '.264', 
                     '.265', '.rmvb', '.rm', '.3gp', '.f4v', '.m2v', '.mp2', '.mpe', 
-                    '.mpv', '.ogv', '.qt', '.vob']
+                    '.mpv', '.ogv', '.qt', '.vob',
+                    '.crm', '.mxf', '.nev', '.r3d']  # Added RAW formats
+
+# RAW video extensions that should always show RAW warning
+RAW_EXTENSIONS = ['.crm', '.nev', '.r3d']
 
 
 def check_ffprobe():
@@ -50,11 +54,11 @@ def get_video_files(path):
 def analyze_video_file(file_path):
     """Analyze a single video file using ffprobe"""
     try:
-        # First call: get basic stream info
+        # First call: get basic stream info (added codec_name for ProRes RAW detection)
         cmd = [
             'ffprobe', '-v', 'error',
             '-select_streams', 'v:0',
-            '-show_entries', 'stream=width,height,r_frame_rate,color_transfer,color_primaries,color_space,pix_fmt',
+            '-show_entries', 'stream=width,height,r_frame_rate,color_transfer,color_primaries,color_space,pix_fmt,codec_name,codec_tag_string',
             '-of', 'json',
             str(file_path)
         ]
@@ -185,6 +189,22 @@ def analyze_video_file(file_path):
         color_category = "SDR"
         is_hdr = False
         is_other_color_space = False
+        is_raw_video = False
+        
+        # Check if file extension indicates RAW format
+        file_ext = Path(file_path).suffix.lower()
+        if file_ext in RAW_EXTENSIONS:
+            is_raw_video = True
+        
+        # Check for ProRes RAW in .mov files
+        codec_name = stream.get('codec_name', '').lower()
+        codec_tag = stream.get('codec_tag_string', '').lower()
+        if file_ext == '.mov':
+            # ProRes RAW codecs: prores_raw, ap4h (ProRes 4444), etc.
+            if 'prores' in codec_name and 'raw' in codec_name:
+                is_raw_video = True
+            elif codec_tag in ['aprh', 'aprn']:  # ProRes RAW HQ and ProRes RAW
+                is_raw_video = True
         
         # Check color transfer
         color_transfer = stream.get('color_transfer')
@@ -305,6 +325,14 @@ def analyze_video_file(file_path):
         
         color_info = ", ".join(color_info_array)
         color_display = ", ".join(color_display_array) if color_display_array else "SDR"
+        
+        # Add RAW video warning if detected
+        if is_raw_video:
+            raw_prefix = '<span style="color: rgb(255, 165, 0); font-weight: bold;" title="RAW视频可能需要提前降噪">⚠️RAW视频</span>'
+            color_display = raw_prefix
+            color_space_color = "red"
+            color_category = "RAW"
+            is_other_color_space = True
         
         # Add Dolby Vision warning prefix if detected
         if is_dolby_vision:
