@@ -36,6 +36,51 @@ def check_ffprobe():
         return False
 
 
+def check_exiftool():
+    """Check if exiftool is available"""
+    try:
+        subprocess.run(['exiftool', '-ver'], 
+                      capture_output=True, check=True, timeout=5)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def get_iso_from_exiftool(file_path):
+    """Get ISO value from video file using exiftool"""
+    try:
+        cmd = [
+            'exiftool', '-json',
+            '-ISO', '-ISOSensitivity', '-RecommendedExposureIndex',
+            str(file_path)
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode != 0:
+            return None
+        
+        data = json.loads(result.stdout)
+        if not data:
+            return None
+        
+        metadata = data[0]
+        
+        # Try different ISO keys in order of preference
+        iso_keys = ['ISO', 'ISOSensitivity', 'RecommendedExposureIndex']
+        for key in iso_keys:
+            if key in metadata and metadata[key]:
+                iso_value = metadata[key]
+                # Handle if it's a number or string
+                if isinstance(iso_value, (int, float)):
+                    return str(int(iso_value))
+                return str(iso_value)
+        
+        return None
+    except Exception as e:
+        print(f"Warning: Failed to get ISO from {file_path}: {e}")
+        return None
+
+
 def get_video_files(path):
     """Get all video files recursively from path"""
     video_files = []
@@ -343,12 +388,17 @@ def analyze_video_file(file_path):
         if is_hdr:
             color_space_color = "blue"
         
+        # Get ISO from exiftool
+        iso_value = get_iso_from_exiftool(file_path)
+        iso_display = iso_value if iso_value else "-"
+        
         file_path_obj = Path(file_path)
         
         return {
             'directory': str(file_path_obj.parent),
             'fileName': file_path_obj.name,
             'fullPath': str(file_path_obj),
+            'iso': iso_display,
             'resolution': resolution,
             'resolutionStatus': resolution_status,
             'resolutionColor': resolution_color,
@@ -432,6 +482,9 @@ def generate_html_report(results, statistics, input_path):
             # colorSpace may contain HTML (for Dolby Vision warning), so don't escape it
             display_color_space = result['colorSpace']
             
+            # Get ISO display value
+            display_iso = result.get('iso', '-')
+            
             table_rows += f'''
             <tr class="data-row {row_class}">
                 <td>
@@ -443,6 +496,7 @@ def generate_html_report(results, statistics, input_path):
                 <td class="{result['resolutionColor']}">{display_res_status}</td>
                 <td class="{result['framerateColor']}">{display_fps_status}</td>
                 <td class="{result['colorSpaceColor']}">{display_color_space}</td>
+                <td>{display_iso}</td>
             </tr>
 '''
     
