@@ -28,6 +28,12 @@ RAW_EXTENSIONS = ['.crm', '.nev', '.r3d']
 
 import sys
 
+# Define subprocess flags for Windows to suppress console window
+if sys.platform == 'win32':
+    SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW
+else:
+    SUBPROCESS_FLAGS = 0
+
 # ... existing imports ...
 
 def get_external_tool_path(tool_name):
@@ -106,11 +112,13 @@ def check_ffprobe():
     """Check if ffprobe is available"""
     tool_path = get_external_tool_path('ffprobe')
     try:
+        # Increased timeout to 30s as 5s was causing issues on some Windows systems
+        # likely due to antivirus scanning or slow disk I/O on first run
         subprocess.run([tool_path, '-version'], 
-                      capture_output=True, check=True, timeout=5)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+                      capture_output=True, check=True, timeout=30, creationflags=SUBPROCESS_FLAGS)
+        return True, None
+    except Exception as e:
+        return False, f"Path: {tool_path}\nError: {str(e)}"
 
 
 def check_exiftool():
@@ -118,7 +126,7 @@ def check_exiftool():
     tool_path = get_external_tool_path('exiftool')
     try:
         subprocess.run([tool_path, '-ver'], 
-                      capture_output=True, check=True, timeout=5)
+                      capture_output=True, check=True, timeout=30, creationflags=SUBPROCESS_FLAGS)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -131,9 +139,10 @@ def get_iso_from_exiftool(file_path):
         cmd = [
             tool_path, '-json',
             '-ISO', '-ISOSensitivity', '-RecommendedExposureIndex',
+            '-ISO', '-ISOSensitivity', '-RecommendedExposureIndex',
             str(file_path)
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, creationflags=SUBPROCESS_FLAGS)
         
         if result.returncode != 0:
             return None
@@ -188,7 +197,7 @@ def analyze_video_file(file_path):
             str(file_path)
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, creationflags=SUBPROCESS_FLAGS)
         
         if result.returncode != 0:
             return None
@@ -211,7 +220,7 @@ def analyze_video_file(file_path):
                 str(file_path)
             ]
             
-            dovi_result = subprocess.run(dovi_cmd, capture_output=True, text=True, timeout=30)
+            dovi_result = subprocess.run(dovi_cmd, capture_output=True, text=True, timeout=30, creationflags=SUBPROCESS_FLAGS)
             
             if dovi_result.returncode == 0:
                 dovi_info = json.loads(dovi_result.stdout)
@@ -500,7 +509,14 @@ def analyze_video_file(file_path):
 def generate_html_report(results, statistics, input_path):
     """Generate HTML report using external template file"""
     # Load template file
-    template_path = Path(__file__).parent / 'templates' / 'report_template.html'
+    # Load template file
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Frozen (PyInstaller)
+        base_path = Path(sys._MEIPASS)
+        template_path = base_path / 'templates' / 'report_template.html'
+    else:
+        # Dev mode
+        template_path = Path(__file__).parent / 'templates' / 'report_template.html'
     
     try:
         with open(template_path, 'r', encoding='utf-8') as f:
@@ -726,8 +742,10 @@ class VideoAnalysisApp:
             messagebox.showerror("错误", "请先选择文件夹")
             return
         
-        if not check_ffprobe():
-            messagebox.showerror("错误", "未检测到 ffprobe，请确保已安装 FFmpeg 并添加到系统 PATH")
+        is_valid, error_msg = check_ffprobe()
+        if not is_valid:
+            messagebox.showerror("错误 - 未检测到 ffprobe", 
+                               f"请确保已安装 FFmpeg。\n\n调试信息:\n{error_msg}")
             return
         
         # Disable button during analysis
