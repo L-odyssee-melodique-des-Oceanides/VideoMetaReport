@@ -211,3 +211,6 @@ __marimo__/
 
 # External
 external/
+
+# Distribution
+dist_done/

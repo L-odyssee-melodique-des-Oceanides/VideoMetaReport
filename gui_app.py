@@ -26,10 +26,87 @@ VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m
 RAW_EXTENSIONS = ['.crm', '.nev', '.r3d']
 
 
+import sys
+
+# ... existing imports ...
+
+def get_external_tool_path(tool_name):
+    """
+    Get the absolute path for an external tool (ffprobe/exiftool)
+    based on the OS and whether we are running in a frozen bundle.
+    """
+    system = sys.platform
+    
+    # Determine the executable name
+    if system == 'win32':
+        filename = f"{tool_name}.exe"
+    else:
+        filename = tool_name
+
+    # 1. Determine base path
+    if getattr(sys, 'frozen', False):
+        # FROZEN (PyInstaller)
+        if system == 'darwin':
+             # macOS .app bundle
+             # sys.executable is inside /Contents/MacOS/
+             # Resources are usually in /Contents/Resources/
+             # However, simple one-file or one-dir builds might behave differently.
+             # We check standard bundle structure first:
+             bundle_dir = os.path.dirname(os.path.abspath(sys.executable))
+             
+             # Case A: Standard .app bundle (Contents/MacOS/ -> Contents/Resources/)
+             # Path to Resources from executable
+             resources_path = os.path.join(bundle_dir, '..', 'Resources')
+             possible_path = os.path.join(resources_path, filename)
+             if os.path.exists(possible_path):
+                 return os.path.abspath(possible_path)
+             
+             # Case B: Sys._MEIPASS (One-file temporary directory)
+             if hasattr(sys, '_MEIPASS'):
+                 possible_path = os.path.join(sys._MEIPASS, filename)
+                 if os.path.exists(possible_path):
+                     return os.path.abspath(possible_path)
+                     
+        elif system == 'win32':
+            # Windows Frozen
+            # Tools should be next to the executable OR in _internal (PyInstaller 6+)
+            base_dir = os.path.dirname(os.path.abspath(sys.executable))
+            
+            # Check next to executable (legacy / one-dir custom)
+            possible_path = os.path.join(base_dir, filename)
+            if os.path.exists(possible_path):
+                return os.path.abspath(possible_path)
+            
+            # Check in _internal (PyInstaller 6+ default)
+            possible_path_internal = os.path.join(base_dir, '_internal', filename)
+            if os.path.exists(possible_path_internal):
+                return os.path.abspath(possible_path_internal)
+                
+    else:
+        # DEV MODE (Running from source)
+        project_root = Path(__file__).parent.absolute()
+        if system == 'win32':
+            # external/windows_x86/
+            tool_path = project_root / 'external' / 'windows_x86' / filename
+        elif system == 'darwin':
+            # external/macos/
+            tool_path = project_root / 'external' / 'macos' / filename
+        else:
+            # Linux or other? Assume system path.
+            return tool_name
+            
+        if tool_path.exists():
+            return str(tool_path)
+
+    # Fallback to system PATH
+    return tool_name
+
+
 def check_ffprobe():
     """Check if ffprobe is available"""
+    tool_path = get_external_tool_path('ffprobe')
     try:
-        subprocess.run(['ffprobe', '-version'], 
+        subprocess.run([tool_path, '-version'], 
                       capture_output=True, check=True, timeout=5)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
@@ -38,8 +115,9 @@ def check_ffprobe():
 
 def check_exiftool():
     """Check if exiftool is available"""
+    tool_path = get_external_tool_path('exiftool')
     try:
-        subprocess.run(['exiftool', '-ver'], 
+        subprocess.run([tool_path, '-ver'], 
                       capture_output=True, check=True, timeout=5)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
@@ -48,9 +126,10 @@ def check_exiftool():
 
 def get_iso_from_exiftool(file_path):
     """Get ISO value from video file using exiftool"""
+    tool_path = get_external_tool_path('exiftool')
     try:
         cmd = [
-            'exiftool', '-json',
+            tool_path, '-json',
             '-ISO', '-ISOSensitivity', '-RecommendedExposureIndex',
             str(file_path)
         ]
@@ -98,10 +177,11 @@ def get_video_files(path):
 
 def analyze_video_file(file_path):
     """Analyze a single video file using ffprobe"""
+    tool_path = get_external_tool_path('ffprobe')
     try:
         # First call: get basic stream info (added codec_name for ProRes RAW detection)
         cmd = [
-            'ffprobe', '-v', 'error',
+            tool_path, '-v', 'error',
             '-select_streams', 'v:0',
             '-show_entries', 'stream=width,height,r_frame_rate,color_transfer,color_primaries,color_space,pix_fmt,codec_name,codec_tag_string',
             '-of', 'json',
@@ -124,7 +204,7 @@ def analyze_video_file(file_path):
         is_dolby_vision = False
         try:
             dovi_cmd = [
-                'ffprobe', '-v', 'error',
+                tool_path, '-v', 'error',
                 '-select_streams', 'v:0',
                 '-show_entries', 'stream_side_data=side_data_type,dv_version_major,dv_version_minor,dv_profile,dv_level,rpu_present_flag,el_present_flag,bl_present_flag,dv_bl_signal_compatibility_id,dv_md_compression',
                 '-of', 'json',
