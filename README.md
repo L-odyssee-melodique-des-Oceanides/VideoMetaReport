@@ -28,7 +28,7 @@ python gui_app.py
 # 执行 standard 打包
 pyinstaller build_macos.spec
 ```
-生成的 `Video Analysis Tool.app` 将只能在与你当前电脑相同架构的 Mac 上运行。
+生成的 `Video Meta Report.app` 将只能在与你当前电脑相同架构的 Mac 上运行。
 
 #### 选项 B: 在 Apple Silicon 上打包 Intel 版本 (x86_64)
 如果你想在 Apple Silicon (M1/M2/M3) 电脑上打包出可以在 Intel Mac 上运行的应用：
@@ -48,7 +48,7 @@ pyinstaller build_macos.spec
     pyinstaller build_macos_x86.spec
     ```
 3.  **结果**: 
-    `dist/Video Analysis Tool (Intel).app` 即为兼容 Intel Mac 的应用。
+    `dist/Video Meta Report (Intel).app` 即为兼容 Intel Mac 的应用。
 
 ### 2. Windows 打包 (生成 .exe)
  
@@ -69,6 +69,6 @@ pyinstaller build_macos.spec
  ```
  
  4.  **结果**:
-     打包完成后，可执行文件位于 `dist/Video Analysis Tool/Video Analysis Tool.exe`。
+     打包完成后，可执行文件位于 `dist/Video Meta Report/Video Meta Report.exe`。
      
-     > 注意：PyInstaller 6.x 版本会将依赖文件放在 `_internal` 文件夹中。请确保 `Video Analysis Tool.exe` 同级目录下存在 `_internal` 文件夹，否则程序将无法找到 `ffprobe` 和 `exiftool`。
+     > 注意：PyInstaller 6.x 版本会将依赖文件放在 `_internal` 文件夹中。请确保 `Video Meta Report.exe` 同级目录下存在 `_internal` 文件夹，否则程序将无法找到 `ffprobe` 和 `exiftool`。

@@ -510,9 +510,26 @@ def generate_html_report(results, statistics, input_path):
     """Generate HTML report using external template file"""
     # Load template file
     # Load template file
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    if getattr(sys, 'frozen', False):
         # Frozen (PyInstaller)
-        base_path = Path(sys._MEIPASS)
+        if hasattr(sys, '_MEIPASS'):
+            # One-file mode
+            base_path = Path(sys._MEIPASS)
+        elif sys.platform == 'darwin':
+            # macOS .app bundle (onedir)
+            # Resources are commonly in ../Resources relative to executable in Contents/MacOS
+            # Check ../Resources/templates first
+            exe_path = Path(sys.executable)
+            resource_path = exe_path.parent.parent / 'Resources'
+            if (resource_path / 'templates').exists():
+                base_path = resource_path
+            else:
+                # Fallback to executable dir
+                base_path = exe_path.parent
+        else:
+            # Windows/Linux onedir mode
+            base_path = Path(sys.executable).parent
+            
         template_path = base_path / 'templates' / 'report_template.html'
     else:
         # Dev mode
@@ -650,8 +667,8 @@ def generate_html_report(results, statistics, input_path):
 class VideoAnalysisApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("🎬 视频批量分析工具")
-        self.root.geometry("600x400")
+        self.root.title("Video Meta Report")
+        self.root.geometry("800x600")
         
         # Queue for thread communication
         self.queue = queue.Queue()
